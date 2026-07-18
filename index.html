@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#00ff00">
+<title>J.S.R Speed Dial — Clean 3D Fixed</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#00ff00;font-family:system-ui,-apple-system,sans-serif}
+  #app,canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #status{position:fixed;left:12px;top:12px;z-index:30;padding:8px 10px;border-radius:10px;background:#000b;color:#fff;font-size:12px}
+  #error{display:none;position:fixed;left:12px;right:12px;top:56px;z-index:40;max-width:760px;margin:auto;padding:14px;border-radius:12px;background:#381016;color:#fff;border:1px solid #ff8198;white-space:pre-wrap;font-size:13px}
+  #toggle{position:fixed;right:12px;top:12px;z-index:35;border:1px solid #ffffff55;border-radius:999px;background:#10131ddd;color:#fff;padding:10px 14px;font-weight:700}
+  #panel{position:fixed;left:10px;right:10px;bottom:10px;z-index:30;max-width:840px;max-height:48svh;overflow:auto;margin:auto;padding:14px;border-radius:18px;background:#0d1019e8;color:#fff;border:1px solid #ffffff35;transition:.22s ease;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+  #panel.hidden{opacity:0;transform:translateY(calc(100% + 24px));pointer-events:none}
+  .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+  label{display:grid;gap:5px;font-size:12px;color:#d9deea}
+  input,select,button{font:inherit}
+  input[type=text],select{width:100%;height:38px;border:1px solid #ffffff2b;border-radius:10px;background:#171b27;color:#fff;padding:0 10px}
+  input[type=range]{width:100%}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .actions button{border:1px solid #ffffff2d;border-radius:10px;background:#ffffff14;color:#fff;padding:10px 13px}
+  .actions .primary{background:#fff;color:#111;font-weight:750}
+  .note{margin-top:9px;color:#adb6c7;font-size:11px}
+  @media(max-width:700px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}#panel{max-height:52svh}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="status">Loading fixed 3D text…</div>
+<div id="error"></div>
+<button id="toggle" type="button">Hide menu</button>
+<section id="panel">
+  <div class="grid">
+    <label>Top line<input id="text1" type="text" value="J.S.R" maxlength="18"></label>
+    <label>Bottom line<input id="text2" type="text" value="Speed Dial" maxlength="18"></label>
+    <label>Background<select id="background"><option value="green" selected>Green screen</option><option value="white">White</option><option value="gray">Light gray</option><option value="black">Black</option></select></label>
+    <label>Text color<select id="textColor"><option value="black" selected>Black</option><option value="gray">Dark gray</option><option value="white">White</option></select></label>
+    <label>Text size <span id="sizeOut">1.00×</span><input id="size" type="range" min=".55" max="1.45" step=".01" value="1"></label>
+    <label>3D depth <span id="depthOut">0.22</span><input id="depth" type="range" min=".05" max=".55" step=".01" value=".22"></label>
+    <label>Line gap <span id="lineGapOut">1.20</span><input id="lineGap" type="range" min=".75" max="1.9" step=".05" value="1.2"></label>
+    <label>Animation speed <span id="speedOut">1.00×</span><input id="speed" type="range" min=".4" max="2.2" step=".05" value="1"></label>
+    <label>Letter delay <span id="staggerOut">0.10 s</span><input id="stagger" type="range" min=".02" max=".28" step=".01" value=".10"></label>
+    <label>Second-line delay <span id="lineDelayOut">0.55 s</span><input id="lineDelay" type="range" min="0" max="2" step=".05" value=".55"></label>
+    <label>Camera distance <span id="zoomOut">8.2</span><input id="zoom" type="range" min="6" max="12" step=".1" value="8.2"></label>
+    <label>Camera motion <span id="motionOut">0.55×</span><input id="motion" type="range" min="0" max="1.5" step=".05" value=".55"></label>
+  </div>
+  <div class="actions">
+    <button id="replay" class="primary" type="button">Replay</button>
+    <button id="save" type="button">Save settings</button>
+    <button id="reset" type="button">Reset</button>
+  </div>
+  <div class="note">No bloom, glow, chrome, HDR, particles, or post-processing. Green screen is selected for recording into NodeVideo.</div>
+</section>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/SVGLoader.js"></script>
+<script src="./glyphs.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>
