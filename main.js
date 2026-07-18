@@ -1,0 +1,48 @@
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
+import { GLYPHS, UNITS_PER_EM } from './glyphs.js';
+
+const $=id=>document.getElementById(id);
+const app=$('app'),status=$('status');
+const fields={text1:$('text1'),text2:$('text2'),color:$('color'),background:$('background'),size:$('size'),speed:$('speed'),bloom:$('bloom'),stagger:$('stagger'),lineDelay:$('lineDelay'),lineGap:$('lineGap'),zoom:$('zoom'),motion:$('motion')};
+const defaults={text1:'GALAXY',text2:'DRAGON',color:'#713cff',background:'black',size:'1',speed:'1',bloom:'1.2',stagger:'.12',lineDelay:'.7',lineGap:'1.25',zoom:'8.4',motion:'1'};
+
+if(!THREE.WebGLRenderer) throw new Error('Three.js did not load. Check your internet connection and refresh.');
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;app.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(34,innerWidth/innerHeight,.1,100);camera.position.z=8.4;
+const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));const bloomPass=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),1.2,.7,.16);composer.addPass(bloomPass);
+const root=new THREE.Group();scene.add(root);
+scene.add(new THREE.AmbientLight(0x8aa6ff,1.15));
+const key=new THREE.DirectionalLight(0xffffff,4.5);key.position.set(-3,4,6);scene.add(key);
+const rim=new THREE.PointLight(0x703cff,45,20,2);rim.position.set(3,-1,4);scene.add(rim);
+const blue=new THREE.PointLight(0x39a7ff,30,18,2);blue.position.set(-4,1,2);scene.add(blue);
+
+const glow=new THREE.Mesh(new THREE.PlaneGeometry(18,11),new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{uColor:{value:new THREE.Color(fields.color.value)},uAlpha:{value:.55}},vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:'varying vec2 vUv;uniform vec3 uColor;uniform float uAlpha;void main(){float d=distance(vUv,vec2(.5));float a=smoothstep(.62,.04,d)*uAlpha;gl_FragColor=vec4(uColor,a);}'}));glow.position.z=-4;scene.add(glow);
+const starsGeo=new THREE.BufferGeometry(),starPos=new Float32Array(240*3);for(let i=0;i<240;i++){starPos[i*3]=(Math.random()-.5)*18;starPos[i*3+1]=(Math.random()-.5)*11;starPos[i*3+2]=-2-Math.random()*7}starsGeo.setAttribute('position',new THREE.BufferAttribute(starPos,3));const stars=new THREE.Points(starsGeo,new THREE.PointsMaterial({size:.035,color:0xd7e7ff,transparent:true,opacity:.58,depthWrite:false}));scene.add(stars);
+
+let letters=[],startTime=performance.now()/1000;
+const loader=new SVGLoader();
+function clamp(x){return Math.max(0,Math.min(1,x))}function smooth(x){return x*x*(3-2*x)}function back(x){const c1=1.70158,c3=c1+1;return 1+c3*(x-1)**3+c1*(x-1)**2}function seeded(n){const x=Math.sin(n*91.17+17.3)*43758.5453;return x-Math.floor(x)}
+function clearLetters(){for(const l of letters){root.remove(l.group);l.group.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}letters=[]}
+function glyphGeometry(ch){const g=GLYPHS[ch]||GLYPHS['?'];if(!g||!g.d)return null;const svg=`<svg xmlns="http://www.w3.org/2000/svg"><path d="${g.d}"/></svg>`;const parsed=loader.parse(svg);const shapes=[];for(const p of parsed.paths)shapes.push(...SVGLoader.createShapes(p));if(!shapes.length)return null;const geo=new THREE.ExtrudeGeometry(shapes,{depth:150,bevelEnabled:true,bevelThickness:24,bevelSize:18,bevelSegments:3,curveSegments:9});geo.scale(1/UNITS_PER_EM,-1/UNITS_PER_EM,1/UNITS_PER_EM);geo.computeBoundingBox();const b=geo.boundingBox;geo.translate(-(b.min.x+b.max.x)/2,-(b.min.y+b.max.y)/2,-(b.min.z+b.max.z)/2);geo.computeVertexNormals();return geo}
+function makeLetter(ch,line,index,count,x,y){const group=new THREE.Group();const geo=glyphGeometry(ch);if(!geo)return null;const color=new THREE.Color(fields.color.value);const mat=new THREE.MeshPhysicalMaterial({color:0xeaf4ff,metalness:.94,roughness:.13,clearcoat:1,clearcoatRoughness:.08,emissive:color,emissiveIntensity:.28});const mesh=new THREE.Mesh(geo,mat);group.add(mesh);const aura=new THREE.Mesh(geo.clone(),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.14,side:THREE.BackSide,depthWrite:false,blending:THREE.AdditiveBlending}));aura.scale.setScalar(1.08);group.add(aura);group.position.set(x,y,0);root.add(group);return{group,mesh,aura,line,index,count,base:new THREE.Vector3(x,y,0),seed:line*50+index+1}}
+function layoutLine(text,line,y){const chars=[...text.toUpperCase()];const spacing=.075;const widths=chars.map(ch=>(GLYPHS[ch]||GLYPHS['?']||{advance:.7}).advance+spacing);const total=widths.reduce((a,b)=>a+b,0)-spacing;let cursor=-total/2;chars.forEach((ch,i)=>{const w=widths[i];if(ch!==' '){const l=makeLetter(ch,line,i,chars.length,cursor+w/2,y);if(l)letters.push(l)}cursor+=w})}
+function build(){clearLetters();const gap=Number(fields.lineGap.value);layoutLine(fields.text1.value||'GALAXY',0,gap/2);layoutLine(fields.text2.value||'DRAGON',1,-gap/2);fit();restart();status.textContent='Ready — tap Replay.'}
+function fit(){const a=fields.text1.value.length,b=fields.text2.value.length,max=Math.max(a,b,1);const auto=Math.min(1,6.2/max);root.scale.setScalar(Number(fields.size.value)*auto)}
+function restart(){startTime=performance.now()/1000}
+function setBackground(){const mode=fields.background.value;if(mode==='green'){renderer.setClearColor(0x00ff00,1);glow.visible=false;stars.visible=false}else if(mode==='transparent'){renderer.setClearColor(0x000000,0);glow.visible=false;stars.visible=false}else{renderer.setClearColor(0x000000,1);glow.visible=true;stars.visible=true}}
+function updateLabels(){$('sizeOut').textContent=Number(fields.size.value).toFixed(2)+'×';$('speedOut').textContent=Number(fields.speed.value).toFixed(2)+'×';$('bloomOut').textContent=Number(fields.bloom.value).toFixed(2);$('staggerOut').textContent=Number(fields.stagger.value).toFixed(2)+' s';$('lineDelayOut').textContent=Number(fields.lineDelay.value).toFixed(2)+' s';$('lineGapOut').textContent=Number(fields.lineGap.value).toFixed(2);$('zoomOut').textContent=Number(fields.zoom.value).toFixed(1);$('motionOut').textContent=Number(fields.motion.value).toFixed(2)+'×'}
+function visuals(rebuild=false){bloomPass.strength=Number(fields.bloom.value);glow.material.uniforms.uColor.value.set(fields.color.value);letters.forEach(l=>{l.mesh.material.emissive.set(fields.color.value);l.aura.material.color.set(fields.color.value)});fit();setBackground();updateLabels();if(rebuild)build()}
+function animate(){requestAnimationFrame(animate);const t=(performance.now()/1000-startTime)*Number(fields.speed.value),motion=Number(fields.motion.value),stagger=Number(fields.stagger.value),lineDelay=Number(fields.lineDelay.value);stars.rotation.z=t*.012;stars.position.y=Math.sin(t*.25)*.08;let latest=0;for(const l of letters){const delay=.2+l.index*stagger+(l.line?lineDelay:0);latest=Math.max(latest,delay);const p=clamp((t-delay)/1.05),e=back(p),side=l.index%2?-1:1,s=l.seed;l.group.visible=p>0;l.group.position.set(l.base.x+(1-e)*side*(2.6+seeded(s)*1.8)*motion,l.base.y+(1-e)*(seeded(s+2)-.5)*3.2*motion,(1-e)*(-5-seeded(s+4)*2.5));l.group.rotation.set((1-e)*(seeded(s+7)-.5)*6*motion,(1-e)*side*(1.4+seeded(s+9)*1.8)*motion,(1-e)*(seeded(s+11)-.5)*2*motion);l.group.scale.setScalar(.16+.84*e);if(p>=1){const q=t-delay;l.group.position.x=l.base.x+Math.sin(q*1.25+s)*.024*motion;l.group.position.y=l.base.y+Math.sin(q*1.7+s*.7)*.045*motion;l.group.position.z=Math.sin(q*1.1+s)*.035*motion;l.group.rotation.y=Math.sin(q*.9+s*.5)*.045*motion;l.group.rotation.z=Math.sin(q*1.15+s)*.016*motion}}
+const reveal=smooth(clamp(t/1.4)),push=smooth(clamp((t-(latest+.25))/1.0)),settle=smooth(clamp((t-(latest+1.25))/1.1));camera.position.z=Number(fields.zoom.value)-reveal*.2-push*.5+settle*.38;camera.position.x=Math.sin(t*.34)*.07*motion;camera.position.y=Math.sin(t*.28)*.045*motion;root.rotation.y=Math.sin(t*.31)*.025*motion;composer.render()}
+
+for(const k of ['text1','text2'])fields[k].addEventListener('change',build);for(const k of ['color','background','size','bloom','lineGap','zoom'])fields[k].addEventListener('input',()=>visuals(k==='lineGap'));for(const k of ['speed','stagger','lineDelay','motion'])fields[k].addEventListener('input',updateLabels);
+$('replay').addEventListener('click',restart);$('save').addEventListener('click',()=>{const d={};for(const[k,v]of Object.entries(fields))d[k]=v.value;localStorage.setItem('galaxy3dTitle',JSON.stringify(d));$('save').textContent='Saved';setTimeout(()=>$('save').textContent='Save settings',800)});$('reset').addEventListener('click',()=>{for(const[k,v]of Object.entries(defaults))fields[k].value=v;localStorage.removeItem('galaxy3dTitle');build();visuals()});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight)});
+try{const saved=JSON.parse(localStorage.getItem('galaxy3dTitle')||'null');if(saved)for(const[k,v]of Object.entries(saved))if(fields[k])fields[k].value=v}catch{}
+build();visuals();animate();
